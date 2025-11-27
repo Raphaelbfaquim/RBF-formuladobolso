@@ -21,9 +21,10 @@ COPY package.json package-lock.json* ./
 COPY next.config.js tsconfig.json tailwind.config.ts postcss.config.js ./
 COPY src ./src
 
-# Criar diretório public se não existir e copiar se tiver conteúdo
+# Criar diretório public (Next.js precisa dele, mesmo que vazio)
 RUN mkdir -p public
-COPY public* ./public/ 2>/dev/null || true
+# Copiar public se existir e tiver arquivos
+COPY public ./public
 
 # Variável de ambiente para build (será sobrescrita no docker-compose)
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
