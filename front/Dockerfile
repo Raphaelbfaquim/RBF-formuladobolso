@@ -22,8 +22,9 @@ COPY tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
 # Copiar código fonte
 COPY src ./src
 
-# Copiar public (criar se não existir)
-COPY public ./public 2>/dev/null || mkdir -p public && touch public/.gitkeep
+# Criar diretório public e copiar se existir
+RUN mkdir -p public
+COPY public ./public/
 
 # Variável de ambiente para build
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
