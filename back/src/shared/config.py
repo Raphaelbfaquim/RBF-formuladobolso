@@ -26,8 +26,18 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_PASSWORD: str = ""
 
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    # CORS - aceita string ou lista
+    CORS_ORIGINS: str | List[str] = "http://localhost:3000,http://localhost:8000"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Converter CORS_ORIGINS para lista se for string
+        if isinstance(self.CORS_ORIGINS, str):
+            if self.CORS_ORIGINS == "*":
+                self.CORS_ORIGINS = ["*"]
+            else:
+                # Separar por vírgula se houver múltiplos valores
+                self.CORS_ORIGINS = [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     # Logging
     LOG_LEVEL: str = "INFO"
