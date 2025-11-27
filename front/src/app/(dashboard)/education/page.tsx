@@ -515,7 +515,7 @@ function CoursesTab() {
       if (response.data.total > 0) {
         toast.success(`${response.data.total} cursos criados com sucesso!`)
       } else {
-        toast.info(response.data.message || 'Todos os cursos já existem')
+        toast(response.data.message || 'Todos os cursos já existem')
       }
       loadCourses()
     } catch (error: any) {
@@ -668,7 +668,7 @@ function FinanceCoursesTab() {
       if (response.data.total > 0) {
         toast.success(`${response.data.total} cursos criados com sucesso!`)
       } else {
-        toast.info(response.data.message || 'Todos os cursos já existem')
+        toast(response.data.message || 'Todos os cursos já existem')
       }
       loadCourses()
     } catch (error: any) {
@@ -777,7 +777,7 @@ function InvestmentCoursesTab() {
       if (response.data.total > 0) {
         toast.success(`${response.data.total} cursos criados com sucesso!`)
       } else {
-        toast.info(response.data.message || 'Todos os cursos já existem')
+        toast(response.data.message || 'Todos os cursos já existem')
       }
       loadCourses()
     } catch (error: any) {
