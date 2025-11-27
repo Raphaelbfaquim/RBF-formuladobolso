@@ -13,7 +13,7 @@
 - ✅ Otimização automática de imagens
 - ✅ Suporte a PWA nativo
 - ✅ Ecossistema gigante (bibliotecas, componentes)
-- ✅ Fácil deploy (Vercel, Docker)
+- ✅ Fácil deploy (AWS, Docker)
 - ✅ Server Components para performance
 
 **Desvantagens:**

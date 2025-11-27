@@ -17,6 +17,7 @@ from src.presentation.schemas.user import (
 )
 from src.presentation.api.dependencies import get_auth_service, get_user_repository
 from src.shared.config import settings
+from src.shared.exceptions import UnauthorizedException
 
 router = APIRouter()
 
@@ -53,11 +54,16 @@ async def login(
         result = await auth_service.authenticate(credentials.email, credentials.password)
         print(f"✅ Login bem-sucedido para: {credentials.email}")
         return result
+    except UnauthorizedException:
+        # Deixa passar para o handler global tratar (retorna 401)
+        raise
     except Exception as e:
-        print(f"❌ Erro no login para {credentials.email}: {str(e)}")
+        # Log do erro interno mas retorna mensagem genérica
+        print(f"❌ Erro interno no login para {credentials.email}: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise
+        # Retorna erro genérico de autenticação para não expor detalhes
+        raise UnauthorizedException("Email ou senha incorretos")
 
 
 @router.post("/refresh", response_model=dict)

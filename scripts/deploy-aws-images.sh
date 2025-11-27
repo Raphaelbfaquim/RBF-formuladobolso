@@ -94,3 +94,4 @@ EOF
 echo -e "\n${GREEN}✅ Deploy finalizado!${NC}"
 echo -e "${BLUE}🌐 Acesse: http://${AWS_HOST#*@}${NC}"
 
+

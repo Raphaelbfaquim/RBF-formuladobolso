@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from src.shared.config import settings
@@ -7,6 +8,14 @@ from src.infrastructure.cache.redis_client import redis_client
 from src.presentation.api.v1.routes import api_router  # routes.py (arquivo, não diretório)
 from src.application.tasks.planning_checker import planning_checker
 from src.presentation.api.middleware.logging_middleware import LoggingMiddleware
+from src.shared.exceptions import (
+    BaseAppException,
+    NotFoundException,
+    ValidationException,
+    UnauthorizedException,
+    ForbiddenException,
+    ConflictException,
+)
 
 
 @asynccontextmanager
@@ -39,6 +48,23 @@ app.add_middleware(
 
 # Logging Middleware
 app.add_middleware(LoggingMiddleware)
+
+# Exception Handlers
+@app.exception_handler(BaseAppException)
+async def base_app_exception_handler(request: Request, exc: BaseAppException):
+    """Handler global para exceções customizadas da aplicação"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message}
+    )
+
+@app.exception_handler(UnauthorizedException)
+async def unauthorized_exception_handler(request: Request, exc: UnauthorizedException):
+    """Handler específico para UnauthorizedException"""
+    return JSONResponse(
+        status_code=401,
+        content={"detail": exc.message}
+    )
 
 # Incluir rotas
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
