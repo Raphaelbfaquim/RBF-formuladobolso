@@ -40,6 +40,8 @@ services:
     image: ${DOCKER_USERNAME:-faquim}/formulado-api:${IMAGE_TAG:-latest}
     container_name: formulado_api
     command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://formulado_user:formulado_pass@postgres:5432/formulado_db
       - DATABASE_SYNC_URL=postgresql://formulado_user:formulado_pass@postgres:5432/formulado_db
