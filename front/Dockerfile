@@ -20,10 +20,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
 COPY next.config.js tsconfig.json tailwind.config.ts postcss.config.js ./
 COPY src ./src
-
-# Criar diretório public (Next.js precisa dele, mesmo que vazio)
-RUN mkdir -p public
-# Copiar public se existir e tiver arquivos
 COPY public ./public
 
 # Variável de ambiente para build (será sobrescrita no docker-compose)
