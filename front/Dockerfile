@@ -16,14 +16,9 @@ WORKDIR /app
 # Copiar node_modules primeiro
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar arquivos de configuração
+# Copiar todos os arquivos (exceto node_modules que já foi copiado)
 COPY package.json package-lock.json* ./
-COPY next.config.js ./
-COPY tsconfig.json ./
-COPY tailwind.config.ts ./
-COPY postcss.config.js ./
-
-# Copiar código fonte
+COPY next.config.js tsconfig.json tailwind.config.ts postcss.config.js ./
 COPY src ./src
 COPY public ./public
 
@@ -32,9 +27,10 @@ ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Verificar se arquivos foram copiados
-RUN ls -la src/lib/api/ && echo "✅ Arquivos copiados"
+RUN ls -la src/lib/api/ && cat src/lib/api/client.ts | head -5
 
-# Build
+# Limpar cache do Next.js e build
+RUN rm -rf .next
 RUN npm run build
 
 # Imagem de produção
