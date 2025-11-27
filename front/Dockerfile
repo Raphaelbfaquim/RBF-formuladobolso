@@ -16,7 +16,7 @@ WORKDIR /app
 # Copiar node_modules primeiro
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar todos os arquivos de uma vez (exceto node_modules)
+# Copiar todos os arquivos de uma vez (exceto node_modules que já foi copiado)
 COPY . .
 
 # Variável de ambiente para build (será sobrescrita no docker-compose)
@@ -50,4 +50,3 @@ ENV HOSTNAME="0.0.0.0"
 
 # Usar o servidor standalone do Next.js
 CMD ["node", "server.js"]
-
