@@ -18,6 +18,10 @@ help:
 	@echo "  make deploy          - Deploy completo (interativo)"
 	@echo "  make deploy-front    - Deploy apenas frontend (Vercel - Gratuito)"
 	@echo "  make deploy-back     - Deploy apenas backend (Render/Railway)"
+	@echo "  make deploy-oracle   - Deploy na Oracle Cloud (via SSH local)"
+	@echo ""
+	@echo "💡 Dica: Configure GitHub Actions para deploy automático!"
+	@echo "   Veja: docs/GITHUB_ACTIONS_SETUP.md"
 	@echo ""
 	@echo "🧪 Testes:"
 	@echo "  make test            - Testar sistema (backend + frontend)"
@@ -69,6 +73,12 @@ deploy-back:
 	@echo "🌐 Configuração do backend no Render..."
 	@echo "📝 Acesse https://render.com e configure manualmente"
 	@echo "📄 Use o arquivo back/render.yaml como referência"
+
+deploy-oracle:
+	@echo "☁️  Deploy na Oracle Cloud..."
+	@echo "📝 Este comando deve ser executado na instância Oracle Cloud"
+	@echo "📄 Veja o guia completo em: docs/DEPLOY_ORACLE.md"
+	@bash scripts/deploy-oracle.sh
 
 setup:
 	@echo "🔧 Setup inicial..."

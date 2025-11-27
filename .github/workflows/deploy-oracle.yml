@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Deploy to Oracle Cloud
 
 on:
   push:
@@ -6,15 +6,12 @@ on:
       - main
     paths:
       - 'back/**'
-      - 'front/**'
-      - 'docker-compose.yml'
-      - 'nginx/**'
-      - '.github/workflows/deploy-aws.yml'
+      - '.github/workflows/deploy-oracle.yml'
   workflow_dispatch: # Permite execução manual
 
 jobs:
   deploy:
-    name: Deploy Backend to AWS
+    name: Deploy Backend to Oracle Cloud
     runs-on: ubuntu-latest
     
     steps:
@@ -24,13 +21,13 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/aws_key
-          chmod 600 ~/.ssh/aws_key
-          ssh-keyscan -H ${{ secrets.AWS_HOST }} >> ~/.ssh/known_hosts
+          echo "${{ secrets.ORACLE_SSH_PRIVATE_KEY }}" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          ssh-keyscan -H ${{ secrets.ORACLE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to AWS
+      - name: Deploy to Oracle Cloud
         run: |
-          ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} << 'EOF'
+          ssh -i ~/.ssh/oracle_key -o StrictHostKeyChecking=no ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'EOF'
             set -e
             echo "🚀 Iniciando deploy..."
             
@@ -48,24 +45,24 @@ jobs:
             git reset --hard origin/main
             git clean -fd
             
-            # Ir para raiz do projeto (já estamos lá)
-            # cd ~/RBF-formuladobolso
+            # Ir para pasta do backend
+            cd back
             
-            # Verificar se .env existe no backend
-            if [ ! -f back/.env ]; then
+            # Verificar se .env existe
+            if [ ! -f .env ]; then
               echo "⚠️  Arquivo .env não encontrado!"
               echo "📝 Criando a partir do exemplo..."
-              cp back/env.example back/.env
-              echo "⚠️  IMPORTANTE: Configure o arquivo back/.env na instância antes do próximo deploy!"
+              cp env.example .env
+              echo "⚠️  IMPORTANTE: Configure o arquivo .env na instância antes do próximo deploy!"
             fi
             
             # Parar containers existentes
             echo "🛑 Parando containers..."
-            sudo docker-compose down || true
+            docker-compose down || true
             
-            # Build e iniciar containers (backend + frontend)
+            # Build e iniciar containers
             echo "🔨 Construindo e iniciando containers..."
-            sudo docker-compose up -d --build
+            docker-compose up -d --build
             
             # Aguardar serviços iniciarem
             echo "⏳ Aguardando serviços iniciarem..."
@@ -74,7 +71,7 @@ jobs:
             # Verificar se PostgreSQL está pronto
             echo "🔍 Verificando PostgreSQL..."
             for i in {1..30}; do
-              if sudo docker-compose exec -T postgres pg_isready -U formulado_user > /dev/null 2>&1; then
+              if docker-compose exec -T postgres pg_isready -U formulado_user > /dev/null 2>&1; then
                 echo "✅ PostgreSQL está pronto!"
                 break
               fi
@@ -84,15 +81,15 @@ jobs:
             
             # Executar migrações
             echo "🔄 Executando migrações..."
-            sudo docker-compose exec -T api alembic upgrade head || {
+            docker-compose exec -T api alembic upgrade head || {
               echo "⚠️  Erro ao executar migrações. Tentando inicializar banco..."
-              sudo docker-compose exec -T api python scripts/init_db.py || true
-              sudo docker-compose exec -T api alembic upgrade head || true
+              docker-compose exec -T api python scripts/init_db.py || true
+              docker-compose exec -T api alembic upgrade head || true
             }
             
             # Verificar status
             echo "📊 Status dos containers:"
-            sudo docker-compose ps
+            docker-compose ps
             
             # Verificar saúde da API
             echo "🏥 Verificando saúde da API..."
@@ -101,7 +98,7 @@ jobs:
               echo "✅ API está respondendo!"
             else
               echo "⚠️  API ainda não está respondendo. Verifique os logs:"
-              echo "   sudo docker-compose logs -f api"
+              echo "   docker-compose logs -f api"
             fi
             
             echo "✅ Deploy concluído!"
@@ -110,18 +107,12 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 10
-          ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} << 'EOF'
-            cd ~/RBF-formuladobolso
-            sudo docker-compose ps
+          ssh -i ~/.ssh/oracle_key -o StrictHostKeyChecking=no ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'EOF'
+            cd ~/RBF-formuladobolso/back
+            docker-compose ps
             echo ""
             echo "📋 Logs recentes da API:"
-            sudo docker-compose logs --tail=20 api
-            echo ""
-            echo "📋 Logs recentes do Frontend:"
-            sudo docker-compose logs --tail=20 frontend
-            echo ""
-            echo "📋 Logs recentes do Nginx:"
-            sudo docker-compose logs --tail=20 nginx
+            docker-compose logs --tail=20 api
           EOF
 
       - name: Notify on failure

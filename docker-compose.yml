@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: formulado_postgres
+    environment:
+      POSTGRES_USER: formulado_user
+      POSTGRES_PASSWORD: formulado_pass
+      POSTGRES_DB: formulado_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formulado_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - formulado_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: formulado_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - formulado_network
+
+  api:
+    build:
+      context: ./back
+      dockerfile: docker/Dockerfile
+    container_name: formulado_api
+    command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./back:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://formulado_user:formulado_pass@postgres:5432/formulado_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - formulado_network
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://3.238.162.190:8000
+    container_name: formulado_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://3.238.162.190:8000
+    depends_on:
+      - api
+    networks:
+      - formulado_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: formulado_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - formulado_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  formulado_network:
+    driver: bridge
+
