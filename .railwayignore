@@ -1,0 +1,16 @@
+# Arquivos ignorados no deploy Railway
+front/
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.git/
+.vscode/
+.idea/
+*.log
+.next/
+dist/
+build/
+
