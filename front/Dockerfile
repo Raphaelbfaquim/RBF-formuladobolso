@@ -1,29 +1,35 @@
-FROM node:20-alpine AS base
+FROM node:20-slim AS base
 
-# Instalar dependências apenas quando necessário
+# Instalar dependências
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copiar arquivos de dependências
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Build da aplicação
 FROM base AS builder
 WORKDIR /app
 
-# Copiar node_modules primeiro
+# Copiar node_modules do stage deps
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar todos os arquivos de uma vez (exceto node_modules que já foi copiado)
-COPY . .
+# Copiar arquivos de configuração
+COPY package.json package-lock.json* ./
+COPY tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
 
-# Variável de ambiente para build (será sobrescrita no docker-compose)
+# Copiar código fonte
+COPY src ./src
+
+# Copiar public (criar se não existir)
+COPY public ./public 2>/dev/null || mkdir -p public && touch public/.gitkeep
+
+# Variável de ambiente para build
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Limpar cache do Next.js e build
+# Limpar cache e build
 RUN rm -rf .next
 RUN npm run build
 
