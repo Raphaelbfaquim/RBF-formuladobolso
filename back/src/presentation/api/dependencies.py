@@ -49,3 +49,17 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Usuário inativo")
     return current_user
 
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """Dependency para obter usuário admin"""
+    from src.infrastructure.database.models.user import UserRole
+    
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar esta funcionalidade."
+        )
+    return current_user
+

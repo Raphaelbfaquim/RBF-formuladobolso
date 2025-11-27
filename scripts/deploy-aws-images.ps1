@@ -1,6 +1,25 @@
 # Script PowerShell para fazer deploy na AWS usando imagens do Docker Hub
+# Uso: .\scripts\deploy-aws-images.ps1 [api|front|all]
+#      api   - Deploy apenas da API
+#      front - Deploy apenas do Frontend
+#      all   - Deploy de ambos (padrao)
+
+param(
+    [string]$service = "all"
+)
 
 $ErrorActionPreference = "Stop"
+
+# Normalizar parametro
+$service = $service.ToLower()
+if ($service -eq "frontend") { $service = "front" }
+
+# Validar parametro
+if ($service -notin @("api", "front", "all")) {
+    Write-Host "Parametro invalido: $service" -ForegroundColor Red
+    Write-Host "Uso: .\scripts\deploy-aws-images.ps1 [api|front|all]" -ForegroundColor Yellow
+    exit 1
+}
 
 # Cores
 function Write-ColorOutput($ForegroundColor) {
@@ -19,7 +38,8 @@ $DOCKER_PASSWORD = $env:DOCKER_PASSWORD
 $IMAGE_TAG = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
 $SSH_KEY = if ($env:AWS_SSH_KEY) { $env:AWS_SSH_KEY } else { "$env:USERPROFILE\.ssh\LightsailDefaultKey-us-east-1.pem" }
 
-Write-ColorOutput Cyan "🚀 Deploy na AWS usando imagens do Docker Hub...`n"
+Write-ColorOutput Cyan "🚀 Deploy na AWS usando imagens do Docker Hub..."
+Write-ColorOutput Cyan "Servico: $service`n"
 
 # Verificar SSH key
 if (-not (Test-Path $SSH_KEY)) {

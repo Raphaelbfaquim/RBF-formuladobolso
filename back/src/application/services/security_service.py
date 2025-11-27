@@ -16,9 +16,14 @@ class SecurityService:
         self.session = session
 
     async def enable_2fa(self, user_id: UUID, method: str = "totp", user_email: Optional[str] = None) -> Dict:
-        """Habilita 2FA para usuário"""
+        """Habilita 2FA para usuário e salva no banco"""
+        import json
+        
         # Gerar secret para TOTP
         secret = pyotp.random_base32()
+        
+        # Gerar códigos de backup
+        backup_codes = self._generate_backup_codes()
         
         # Criar URI para QR Code
         totp = pyotp.TOTP(secret)
@@ -30,6 +35,7 @@ class SecurityService:
         )
         
         # Gerar QR Code
+        qr_code_data = None
         try:
             qr = qrcode.QRCode(version=1, box_size=10, border=5)
             qr.add_data(uri)
@@ -42,22 +48,53 @@ class SecurityService:
             
             print(f"✅ QR Code gerado com sucesso (tamanho: {len(qr_code_data)} bytes)")
             print(f"   URI: {uri}")
-            
-            return {
-                "secret": secret,
-                "qr_code": qr_code_data,
-                "backup_codes": self._generate_backup_codes(),
-            }
         except Exception as e:
             print(f"❌ Erro ao gerar QR Code: {e}")
             import traceback
             traceback.print_exc()
-            # Retornar mesmo sem QR code para não quebrar o fluxo
-            return {
-                "secret": secret,
-                "qr_code": None,
-                "backup_codes": self._generate_backup_codes(),
-            }
+        
+        # Salvar no banco de dados
+        try:
+            # Verificar se já existe registro de 2FA para este usuário
+            from sqlalchemy import select
+            stmt = select(TwoFactorAuth).where(TwoFactorAuth.user_id == user_id)
+            result = await self.session.execute(stmt)
+            existing_2fa = result.scalar_one_or_none()
+            
+            # Converter método para enum
+            method_enum = TwoFactorMethod.TOTP if method.lower() == "totp" else TwoFactorMethod(method.lower())
+            
+            if existing_2fa:
+                # Atualizar registro existente
+                existing_2fa.secret = secret
+                existing_2fa.method = method_enum
+                existing_2fa.backup_codes = json.dumps(backup_codes)
+                existing_2fa.is_enabled = True
+                existing_2fa.updated_at = datetime.now(pytz.UTC)
+            else:
+                # Criar novo registro
+                two_factor_auth = TwoFactorAuth(
+                    user_id=user_id,
+                    secret=secret,
+                    method=method_enum,
+                    backup_codes=json.dumps(backup_codes),
+                    is_enabled=True,
+                )
+                self.session.add(two_factor_auth)
+            
+            await self.session.commit()
+            print(f"✅ 2FA salvo no banco de dados para usuário {user_id}")
+        except Exception as e:
+            print(f"❌ Erro ao salvar 2FA no banco: {e}")
+            import traceback
+            traceback.print_exc()
+            await self.session.rollback()
+        
+        return {
+            "secret": secret,
+            "qr_code": qr_code_data,
+            "backup_codes": backup_codes,
+        }
 
     def _generate_backup_codes(self) -> List[str]:
         """Gera códigos de backup"""

@@ -28,6 +28,7 @@ from src.presentation.api.v1.routes import (
     calendar,
     scheduled_transactions,
     logs,
+    admin,
 )
 
 api_router = APIRouter()
@@ -61,4 +62,5 @@ api_router.include_router(transfers.router, prefix="/transfers", tags=["transfer
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 api_router.include_router(scheduled_transactions.router, prefix="/scheduled-transactions", tags=["scheduled-transactions"])
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 

@@ -70,3 +70,33 @@ class SQLAlchemyUserRepository(UserRepository):
         await self.session.commit()
         return True
 
+    async def update_user(self, user_id: UUID, **kwargs) -> User:
+        """Atualiza campos de um usuário"""
+        # Filtrar apenas campos válidos do modelo User
+        valid_fields = {
+            'email', 'username', 'full_name', 'phone_number',
+            'is_active', 'is_verified', 'role'
+        }
+        update_data = {k: v for k, v in kwargs.items() if k in valid_fields}
+        
+        if not update_data:
+            # Se não há nada para atualizar, apenas retornar o usuário
+            user = await self.get_by_id(user_id)
+            if not user:
+                raise ValueError("Usuário não encontrado")
+            return user
+        
+        stmt = (
+            update(User)
+            .where(User.id == user_id)
+            .values(**update_data)
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
+        
+        # Retornar usuário atualizado
+        user = await self.get_by_id(user_id)
+        if not user:
+            raise ValueError("Usuário não encontrado após atualização")
+        return user
+

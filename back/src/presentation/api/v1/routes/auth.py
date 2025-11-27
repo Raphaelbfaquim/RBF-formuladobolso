@@ -28,19 +28,77 @@ def get_user_use_cases(
     return UserUseCases(user_repository)
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: UserCreate,
     use_cases: UserUseCases = Depends(get_user_use_cases),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Registra um novo usuário"""
-    user = await use_cases.create_user(
-        email=user_data.email,
-        username=user_data.username,
-        password=user_data.password,
-        full_name=user_data.full_name,
-    )
-    return user
+    """Registra um novo usuário e habilita 2FA"""
+    try:
+        from src.application.services.security_service import SecurityService
+        import base64
+        
+        print(f"🔐 Iniciando registro de usuário: {user_data.email}")
+        
+        # Criar usuário
+        user = await use_cases.create_user(
+            email=user_data.email,
+            username=user_data.username,
+            password=user_data.password,
+            full_name=user_data.full_name,
+        )
+        print(f"✅ Usuário criado: {user.id}")
+        
+        # Habilitar 2FA (igual ao cadastro via convite)
+        print(f"🔐 Habilitando 2FA para usuário: {user.id}")
+        security_service = SecurityService(db)
+        two_factor_data = await security_service.enable_2fa(user.id, "totp", user_email=user.email)
+        print(f"✅ 2FA habilitado. Secret gerado: {two_factor_data.get('secret')[:10]}...")
+        
+        # Converter QR code para base64 string
+        qr_code_base64 = None
+        qr_code_data = two_factor_data.get("qr_code")
+        
+        if qr_code_data:
+            if isinstance(qr_code_data, bytes):
+                qr_code_base64 = base64.b64encode(qr_code_data).decode('utf-8')
+                print(f"✅ QR Code gerado e convertido para base64 (tamanho: {len(qr_code_base64)} caracteres)")
+            else:
+                print(f"⚠️  QR Code não é bytes, tipo: {type(qr_code_data)}")
+        else:
+            print(f"❌ QR Code não foi gerado (qr_code_data é None)")
+        
+        # Retornar dados do usuário e 2FA
+        response_data = {
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "username": user.username,
+                "full_name": user.full_name,
+                "is_active": user.is_active,
+                "is_verified": user.is_verified,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+            },
+            "two_factor": {
+                "secret": two_factor_data["secret"],
+                "qr_code": qr_code_base64,
+                "backup_codes": two_factor_data["backup_codes"],
+            },
+            "message": "Conta criada com sucesso! Configure seu autenticador 2FA."
+        }
+        
+        print(f"✅ Registro concluído. Retornando dados com 2FA: {bool(response_data.get('two_factor'))}")
+        return response_data
+        
+    except Exception as e:
+        print(f"❌ Erro no registro: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao criar conta: {str(e)}"
+        )
 
 
 @router.post("/login", response_model=TokenResponse)
