@@ -86,7 +86,7 @@ O frontend utiliza um design único e inovador:
 - ✅ **Calendário financeiro**
 - ✅ **Sistema de logs completo**
 
-## 🚀 Deploy Rápido
+## 🚀 Deploy na AWS
 
 ### Deploy Automático
 
@@ -94,14 +94,13 @@ O frontend utiliza um design único e inovador:
 # Deploy completo (interativo)
 make deploy
 
-# Apenas frontend (Vercel - Gratuito)
-make deploy-front
+# Apenas frontend (AWS Lightsail)
+.\scripts\deploy-direto-aws.ps1
 
-# Apenas backend (Render - Gratuito)
-make deploy-back
+# Apenas backend ()
 ```
 
-**Custo**: Gratuito (Vercel + Supabase) ou ~R$ 35/mês (com PostgreSQL pago)
+**Custo**: Gratuito (AWS Lightsail) ou ~R$ 35/mês (com PostgreSQL pago)
 
 📚 **Guia completo**: [docs/DEPLOY.md](./docs/DEPLOY.md) | [DEPLOY_QUICK.md](./DEPLOY_QUICK.md)
 
