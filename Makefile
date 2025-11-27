@@ -20,6 +20,10 @@ help:
 	@echo "  make deploy-back     - Deploy apenas backend (Render/Railway)"
 	@echo "  make deploy-oracle   - Deploy na Oracle Cloud (via SSH local)"
 	@echo ""
+	@echo "🐳 Docker Hub (Recomendado - Build local + Push):"
+	@echo "  make docker-build    - Buildar imagens localmente e fazer push para Docker Hub"
+	@echo "  make docker-deploy   - Deploy na AWS usando imagens do Docker Hub (mais rápido!)"
+	@echo ""
 	@echo "💡 Dica: Configure GitHub Actions para deploy automático!"
 	@echo "   Veja: docs/GITHUB_ACTIONS_SETUP.md"
 	@echo ""
@@ -79,6 +83,16 @@ deploy-oracle:
 	@echo "📝 Este comando deve ser executado na instância Oracle Cloud"
 	@echo "📄 Veja o guia completo em: docs/DEPLOY_ORACLE.md"
 	@bash scripts/deploy-oracle.sh
+
+docker-build:
+	@echo "🐳 Buildando imagens e fazendo push para Docker Hub..."
+	@echo "💡 Certifique-se de estar logado: docker login"
+	@bash scripts/build-and-push.sh
+
+docker-deploy:
+	@echo "🚀 Deploy na AWS usando imagens do Docker Hub..."
+	@echo "💡 Configure DOCKER_USERNAME e DOCKER_PASSWORD"
+	@bash scripts/deploy-aws-images.sh
 
 setup:
 	@echo "🔧 Setup inicial..."
