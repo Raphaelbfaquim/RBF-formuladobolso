@@ -37,11 +37,12 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${DOCKER_USERNAME:-raphaelbfaquim}/formulado-api:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-faquim}/formulado-api:${IMAGE_TAG:-latest}
     container_name: formulado_api
     command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000
     environment:
       - DATABASE_URL=postgresql+asyncpg://formulado_user:formulado_pass@postgres:5432/formulado_db
+      - DATABASE_SYNC_URL=postgresql://formulado_user:formulado_pass@postgres:5432/formulado_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - SECRET_KEY=${SECRET_KEY}
@@ -57,7 +58,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ${DOCKER_USERNAME:-raphaelbfaquim}/formulado-frontend:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-faquim}/formulado-frontend:${IMAGE_TAG:-latest}
     container_name: formulado_frontend
     environment:
       - NEXT_PUBLIC_API_URL=http://api:8000/api/v1
@@ -91,4 +92,5 @@ volumes:
 networks:
   formulado_network:
     driver: bridge
+
 
