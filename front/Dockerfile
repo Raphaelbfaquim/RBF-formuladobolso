@@ -19,6 +19,10 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Verificar se arquivos foram copiados
+RUN ls -la src/lib/api/ || echo "Diretório não encontrado"
+
+# Build
 RUN npm run build
 
 # Imagem de produção
