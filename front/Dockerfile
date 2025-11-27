@@ -12,15 +12,27 @@ RUN npm ci
 # Build da aplicação
 FROM base AS builder
 WORKDIR /app
+
+# Copiar node_modules primeiro
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+
+# Copiar arquivos de configuração
+COPY package.json package-lock.json* ./
+COPY next.config.js ./
+COPY tsconfig.json ./
+COPY tailwind.config.ts ./
+COPY postcss.config.js ./
+
+# Copiar código fonte
+COPY src ./src
+COPY public ./public
 
 # Variável de ambiente para build (será sobrescrita no docker-compose)
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Verificar se arquivos foram copiados
-RUN ls -la src/lib/api/ || echo "Diretório não encontrado"
+RUN ls -la src/lib/api/ && echo "✅ Arquivos copiados"
 
 # Build
 RUN npm run build
