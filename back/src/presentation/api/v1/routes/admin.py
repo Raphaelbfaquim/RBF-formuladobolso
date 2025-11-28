@@ -7,12 +7,10 @@ from datetime import datetime, timedelta
 import pytz
 
 from src.presentation.api.dependencies import get_current_admin_user, get_db, get_user_repository
-from src.infrastructure.database.models.user import User, UserRole
+from src.infrastructure.database.models.user import User, UserRole, Family, FamilyMember
 from src.infrastructure.database.models.security import SecurityAlert, AuditLog, TwoFactorAuth
-from src.infrastructure.database.models.family import Family
 from src.infrastructure.database.models.transaction import Transaction
 from src.infrastructure.database.models.account import Account
-from src.infrastructure.database.models.family_member import FamilyMember
 from src.presentation.schemas.admin import (
     AdminDashboardResponse,
     AdminDashboardStats,
@@ -201,7 +199,7 @@ async def list_users(
             families_count = (await db.execute(families_stmt)).scalar() or 0
 
             # Contar contas
-            accounts_stmt = select(func.count(Account.id)).where(Account.user_id == user.id)
+            accounts_stmt = select(func.count(Account.id)).where(Account.owner_id == user.id)
             accounts_count = (await db.execute(accounts_stmt)).scalar() or 0
 
             # Contar transações
@@ -272,7 +270,7 @@ async def get_user_detail(
         families_count = (await db.execute(families_stmt)).scalar() or 0
 
         # Contar contas
-        accounts_stmt = select(func.count(Account.id)).where(Account.user_id == user.id)
+        accounts_stmt = select(func.count(Account.id)).where(Account.owner_id == user.id)
         accounts_count = (await db.execute(accounts_stmt)).scalar() or 0
 
         # Contar transações
@@ -616,5 +614,208 @@ async def get_security_alerts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao listar alertas: {str(e)}"
+        )
+
+
+@router.put("/security-alerts/{alert_id}/read")
+async def mark_alert_read(
+    alert_id: UUID,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Marca um alerta de segurança como lido (apenas admin)"""
+    try:
+        stmt = select(SecurityAlert).where(SecurityAlert.id == alert_id)
+        result = await db.execute(stmt)
+        alert = result.scalar_one_or_none()
+        
+        if not alert:
+            raise HTTPException(status_code=404, detail="Alerta não encontrado")
+        
+        alert.is_read = True
+        await db.commit()
+        await db.refresh(alert)
+        
+        return {"message": "Alerta marcado como lido", "alert_id": str(alert_id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        print(f"Erro ao marcar alerta como lido: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao marcar alerta como lido: {str(e)}"
+        )
+
+
+@router.get("/families")
+async def list_families(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista todas as famílias do sistema (apenas admin)"""
+    try:
+        stmt = select(Family)
+
+        # Aplicar filtros
+        if search:
+            stmt = stmt.where(
+                or_(
+                    Family.name.ilike(f"%{search}%"),
+                    Family.description.ilike(f"%{search}%"),
+                )
+            )
+
+        # Contar total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+
+        # Aplicar paginação e ordenação
+        stmt = stmt.order_by(Family.created_at.desc())
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+
+        # Executar query
+        result = await db.execute(stmt)
+        families = result.scalars().all()
+
+        # Buscar informações adicionais para cada família
+        families_data = []
+        for family in families:
+            # Contar membros
+            members_stmt = select(func.count(FamilyMember.id)).where(
+                FamilyMember.family_id == family.id
+            )
+            members_count = (await db.execute(members_stmt)).scalar() or 0
+
+            # Contar contas
+            accounts_stmt = select(func.count(Account.id)).where(Account.family_id == family.id)
+            accounts_count = (await db.execute(accounts_stmt)).scalar() or 0
+
+            # Buscar criador
+            creator_stmt = select(User).where(User.id == family.created_by)
+            creator_result = await db.execute(creator_stmt)
+            creator = creator_result.scalar_one_or_none()
+
+            families_data.append({
+                "id": str(family.id),
+                "name": family.name,
+                "description": family.description,
+                "created_by": str(family.created_by),
+                "creator_email": creator.email if creator else None,
+                "creator_username": creator.username if creator else None,
+                "members_count": members_count,
+                "accounts_count": accounts_count,
+                "created_at": family.created_at.isoformat() if family.created_at else None,
+                "updated_at": family.updated_at.isoformat() if family.updated_at else None,
+            })
+
+        return {
+            "families": families_data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+        }
+    except Exception as e:
+        print(f"Erro ao listar famílias: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao listar famílias: {str(e)}"
+        )
+
+
+@router.get("/reports/summary")
+async def get_reports_summary(
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resumo de relatórios do sistema (apenas admin)"""
+    try:
+        now = datetime.now(pytz.UTC)
+        if not start_date:
+            start_date = now - timedelta(days=30)
+        if not end_date:
+            end_date = now
+
+        # Total de transações no período
+        transactions_stmt = select(func.count(Transaction.id)).where(
+            and_(
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date
+            )
+        )
+        total_transactions = (await db.execute(transactions_stmt)).scalar() or 0
+
+        # Volume total no período
+        volume_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            and_(
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date
+            )
+        )
+        total_volume = (await db.execute(volume_stmt)).scalar() or 0
+
+        # Total de receitas
+        income_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            and_(
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date,
+                Transaction.amount > 0
+            )
+        )
+        total_income = (await db.execute(income_stmt)).scalar() or 0
+
+        # Total de despesas
+        expense_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            and_(
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date,
+                Transaction.amount < 0
+            )
+        )
+        total_expenses = abs((await db.execute(expense_stmt)).scalar() or 0)
+
+        # Total de contas ativas
+        active_accounts_stmt = select(func.count(Account.id)).where(Account.is_active == True)
+        active_accounts = (await db.execute(active_accounts_stmt)).scalar() or 0
+
+        # Total de famílias
+        families_stmt = select(func.count(Family.id))
+        total_families = (await db.execute(families_stmt)).scalar() or 0
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "transactions": {
+                "total": total_transactions,
+                "volume": float(total_volume),
+                "income": float(total_income),
+                "expenses": float(total_expenses),
+            },
+            "accounts": {
+                "active": active_accounts,
+            },
+            "families": {
+                "total": total_families,
+            },
+        }
+    except Exception as e:
+        print(f"Erro ao gerar resumo de relatórios: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao gerar resumo: {str(e)}"
         )
 

@@ -1,0 +1,9 @@
+# Ignorar node_modules em todos os sites
+**/node_modules/
+**/.next/
+**/.env.local
+**/.env*.local
+
+# Manter estrutura de diretórios
+!.gitkeep
+

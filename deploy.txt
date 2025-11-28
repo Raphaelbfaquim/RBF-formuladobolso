@@ -1,14 +1,60 @@
- DEPLOY DIRETO (sem Docker Hub - mais rapido):
-   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1
-   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1 api
-   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1 front
+============================================
+DEPLOY COMPLETO (RECOMENDADO - TUDO DE UMA VEZ):
+============================================
 
- DOCKER HUB - Build e Push:
-   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1
-   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1 api
-   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1 front
+Deploy completo com build, push, deploy e testes:
+  powershell -ExecutionPolicy Bypass -File .\deploy-completo.ps1 all
+  powershell -ExecutionPolicy Bypass -File .\deploy-completo.ps1 api
+  powershell -ExecutionPolicy Bypass -File .\deploy-completo.ps1 front
+  powershell -ExecutionPolicy Bypass -File .\deploy-completo.ps1 marketing
 
- DOCKER HUB - Deploy:
-   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1
-   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1 api
-   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1 front
+============================================
+DEPLOY EM DOIS PASSOS (SE PRECISAR):
+============================================
+
+PASSO 1 - Build e Push para Docker Hub:
+  powershell -ExecutionPolicy Bypass -File .\deploy-build-push.ps1 all
+  powershell -ExecutionPolicy Bypass -File .\deploy-build-push.ps1 api
+  powershell -ExecutionPolicy Bypass -File .\deploy-build-push.ps1 front
+  powershell -ExecutionPolicy Bypass -File .\deploy-build-push.ps1 marketing
+
+PASSO 2 - Deploy no Servidor (com testes):
+  powershell -ExecutionPolicy Bypass -File .\deploy-server.ps1 all
+  powershell -ExecutionPolicy Bypass -File .\deploy-server.ps1 api
+  powershell -ExecutionPolicy Bypass -File .\deploy-server.ps1 front
+  powershell -ExecutionPolicy Bypass -File .\deploy-server.ps1 marketing
+
+============================================
+NOTAS IMPORTANTES:
+============================================
+
+1. Certifique-se de estar logado no Docker Hub antes:
+   docker login -u efaquim
+   (Digite seu token quando pedir a senha)
+
+2. O servidor precisa estar acessivel via SSH
+
+3. Execute o PASSO 1 primeiro, depois o PASSO 2
+
+4. Se der erro de politica de execucao, sempre use:
+   powershell -ExecutionPolicy Bypass -File .\nome-do-script.ps1
+
+============================================
+SITES DE VENDAS:
+============================================
+
+Para adicionar um novo site de vendas:
+
+1. Criar estrutura do site:
+   powershell -ExecutionPolicy Bypass -File .\scripts\add-new-site.ps1 nome-do-site
+
+2. Desenvolver o site em sites/nome-do-site/
+
+3. Adicionar ao docker-compose.prod.yml e nginx.conf
+   (veja sites/README.md para instruções detalhadas)
+
+4. Build e deploy:
+   powershell -ExecutionPolicy Bypass -File .\deploy-build-push.ps1 nome-do-site
+   powershell -ExecutionPolicy Bypass -File .\deploy-server.ps1 all
+
+Documentacao completa: sites/README.md

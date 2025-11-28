@@ -75,7 +75,7 @@ class SQLAlchemyUserRepository(UserRepository):
         # Filtrar apenas campos válidos do modelo User
         valid_fields = {
             'email', 'username', 'full_name', 'phone_number',
-            'is_active', 'is_verified', 'role'
+            'is_active', 'is_verified', 'role', 'theme_preference'
         }
         update_data = {k: v for k, v in kwargs.items() if k in valid_fields}
         

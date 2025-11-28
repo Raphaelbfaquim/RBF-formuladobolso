@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   output: 'standalone', // Necessário para Docker
+  basePath: '/app', // Frontend da aplicação em /app
   images: {
     domains: [],
   },

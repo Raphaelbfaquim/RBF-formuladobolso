@@ -50,6 +50,29 @@ export default function AdminPage() {
   })
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  
+  // Estados para Famílias
+  const [families, setFamilies] = useState<any[]>([])
+  const [familiesPage, setFamiliesPage] = useState(1)
+  const [familiesTotalPages, setFamiliesTotalPages] = useState(1)
+  const [familiesSearch, setFamiliesSearch] = useState('')
+  
+  // Estados para Segurança
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([])
+  const [logsPage, setLogsPage] = useState(1)
+  const [alertsPage, setAlertsPage] = useState(1)
+  
+  // Estados para Relatórios
+  const [reportsData, setReportsData] = useState<any>(null)
+  const [reportsStartDate, setReportsStartDate] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date.toISOString().split('T')[0]
+  })
+  const [reportsEndDate, setReportsEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
 
   useEffect(() => {
     checkAdminAccess()
@@ -57,8 +80,14 @@ export default function AdminPage() {
       loadDashboard()
     } else if (activeTab === 'users') {
       loadUsers()
+    } else if (activeTab === 'families') {
+      loadFamilies()
+    } else if (activeTab === 'security') {
+      loadSecurityData()
+    } else if (activeTab === 'reports') {
+      loadReports()
     }
-  }, [activeTab, page, searchTerm, filters])
+  }, [activeTab, page, searchTerm, filters, familiesPage, familiesSearch, logsPage, alertsPage])
 
   const checkAdminAccess = async () => {
     try {
@@ -162,6 +191,68 @@ export default function AdminPage() {
       loadUsers()
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Erro ao remover privilégios')
+    }
+  }
+
+  const loadFamilies = async () => {
+    setLoading(true)
+    try {
+      const params: any = {
+        page: familiesPage,
+        page_size: 20,
+      }
+      if (familiesSearch) params.search = familiesSearch
+
+      const response = await apiClient.get('/admin/families', { params })
+      setFamilies(response.data.families)
+      setFamiliesTotalPages(response.data.total_pages)
+    } catch (error: any) {
+      toast.error('Erro ao carregar famílias')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadSecurityData = async () => {
+    setLoading(true)
+    try {
+      const [logsResponse, alertsResponse] = await Promise.all([
+        apiClient.get('/admin/audit-logs', { params: { page: logsPage, page_size: 20 } }),
+        apiClient.get('/admin/security-alerts', { params: { page: alertsPage, page_size: 20, is_read: false } }),
+      ])
+      setAuditLogs(logsResponse.data.logs)
+      setSecurityAlerts(alertsResponse.data.alerts)
+    } catch (error: any) {
+      toast.error('Erro ao carregar dados de segurança')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadReports = async () => {
+    setLoading(true)
+    try {
+      const params: any = {}
+      if (reportsStartDate) params.start_date = reportsStartDate
+      if (reportsEndDate) params.end_date = reportsEndDate
+
+      const response = await apiClient.get('/admin/reports/summary', { params })
+      setReportsData(response.data)
+    } catch (error: any) {
+      toast.error('Erro ao carregar relatórios')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMarkAlertRead = async (alertId: string) => {
+    try {
+      // Endpoint para marcar alerta como lido (precisa ser criado)
+      await apiClient.put(`/admin/security-alerts/${alertId}/read`)
+      toast.success('Alerta marcado como lido')
+      loadSecurityData()
+    } catch (error: any) {
+      toast.error('Erro ao marcar alerta como lido')
     }
   }
 
@@ -469,23 +560,285 @@ export default function AdminPage() {
               {activeTab === 'families' && (
                 <div>
                   <h2 className="text-2xl font-bold mb-6">Gerenciamento de Famílias</h2>
-                  <p className="text-muted-foreground">Em desenvolvimento...</p>
+                  
+                  {/* Busca */}
+                  <div className="mb-6">
+                    <input
+                      type="text"
+                      placeholder="Buscar por nome ou descrição..."
+                      value={familiesSearch}
+                      onChange={(e) => {
+                        setFamiliesSearch(e.target.value)
+                        setFamiliesPage(1)
+                      }}
+                      className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {loading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-border">
+                              <th className="text-left p-3">Nome</th>
+                              <th className="text-left p-3">Criador</th>
+                              <th className="text-left p-3">Membros</th>
+                              <th className="text-left p-3">Contas</th>
+                              <th className="text-left p-3">Criada em</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {families.map((family) => (
+                              <tr key={family.id} className="border-b border-border hover:bg-background">
+                                <td className="p-3">
+                                  <div className="font-medium">{family.name}</div>
+                                  {family.description && (
+                                    <div className="text-sm text-muted-foreground">{family.description}</div>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <div>{family.creator_username || family.creator_email}</div>
+                                </td>
+                                <td className="p-3">{family.members_count}</td>
+                                <td className="p-3">{family.accounts_count}</td>
+                                <td className="p-3 text-sm text-muted-foreground">
+                                  {new Date(family.created_at).toLocaleDateString('pt-BR')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {familiesTotalPages > 1 && (
+                        <div className="mt-6 flex justify-center gap-2">
+                          <button
+                            onClick={() => setFamiliesPage(p => Math.max(1, p - 1))}
+                            disabled={familiesPage === 1}
+                            className="px-4 py-2 bg-background border border-border rounded disabled:opacity-50"
+                          >
+                            Anterior
+                          </button>
+                          <span className="px-4 py-2">
+                            Página {familiesPage} de {familiesTotalPages}
+                          </span>
+                          <button
+                            onClick={() => setFamiliesPage(p => Math.min(familiesTotalPages, p + 1))}
+                            disabled={familiesPage === familiesTotalPages}
+                            className="px-4 py-2 bg-background border border-border rounded disabled:opacity-50"
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Tab: Segurança */}
               {activeTab === 'security' && (
-                <div>
+                <div className="space-y-8">
                   <h2 className="text-2xl font-bold mb-6">Segurança e Auditoria</h2>
-                  <p className="text-muted-foreground">Em desenvolvimento...</p>
+                  
+                  {/* Alertas de Segurança */}
+                  <div>
+                    <h3 className="text-xl font-semibold mb-4">🔔 Alertas de Segurança</h3>
+                    {loading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {securityAlerts.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-8">Nenhum alerta pendente</p>
+                        ) : (
+                          securityAlerts.map((alert) => (
+                            <div
+                              key={alert.id}
+                              className={`p-4 rounded-lg border ${
+                                alert.severity === 'high'
+                                  ? 'bg-red-500/10 border-red-500/20'
+                                  : alert.severity === 'medium'
+                                  ? 'bg-yellow-500/10 border-yellow-500/20'
+                                  : 'bg-blue-500/10 border-blue-500/20'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium">{alert.alert_type}</span>
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                      alert.severity === 'high'
+                                        ? 'bg-red-500/20 text-red-400'
+                                        : alert.severity === 'medium'
+                                        ? 'bg-yellow-500/20 text-yellow-400'
+                                        : 'bg-blue-500/20 text-blue-400'
+                                    }`}>
+                                      {alert.severity}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-1">{alert.message}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(alert.created_at).toLocaleString('pt-BR')}
+                                  </p>
+                                </div>
+                                {!alert.is_read && (
+                                  <button
+                                    onClick={() => handleMarkAlertRead(alert.id)}
+                                    className="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+                                  >
+                                    Marcar como lido
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Logs de Auditoria */}
+                  <div>
+                    <h3 className="text-xl font-semibold mb-4">📋 Logs de Auditoria</h3>
+                    {loading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto"></div>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-border">
+                              <th className="text-left p-3">Ação</th>
+                              <th className="text-left p-3">Tipo</th>
+                              <th className="text-left p-3">IP</th>
+                              <th className="text-left p-3">Data</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {auditLogs.map((log) => (
+                              <tr key={log.id} className="border-b border-border hover:bg-background">
+                                <td className="p-3">{log.action}</td>
+                                <td className="p-3">
+                                  <span className="px-2 py-1 rounded text-xs bg-gray-500/20 text-gray-400">
+                                    {log.resource_type}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-sm text-muted-foreground">{log.ip_address}</td>
+                                <td className="p-3 text-sm text-muted-foreground">
+                                  {new Date(log.created_at).toLocaleString('pt-BR')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Tab: Relatórios */}
               {activeTab === 'reports' && (
                 <div>
-                  <h2 className="text-2xl font-bold mb-6">Relatórios</h2>
-                  <p className="text-muted-foreground">Em desenvolvimento...</p>
+                  <h2 className="text-2xl font-bold mb-6">Relatórios do Sistema</h2>
+                  
+                  {/* Filtros de Data */}
+                  <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Data Inicial</label>
+                      <input
+                        type="date"
+                        value={reportsStartDate}
+                        onChange={(e) => setReportsStartDate(e.target.value)}
+                        className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Data Final</label>
+                      <input
+                        type="date"
+                        value={reportsEndDate}
+                        onChange={(e) => setReportsEndDate(e.target.value)}
+                        className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={loadReports}
+                        className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      >
+                        Gerar Relatório
+                      </button>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+                    </div>
+                  ) : reportsData ? (
+                    <div className="space-y-6">
+                      {/* Estatísticas Gerais */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Total de Transações</div>
+                          <div className="text-2xl font-bold">{reportsData.transactions.total.toLocaleString()}</div>
+                        </div>
+
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Volume Total</div>
+                          <div className="text-2xl font-bold">
+                            R$ {reportsData.transactions.volume.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Total de Receitas</div>
+                          <div className="text-2xl font-bold text-green-400">
+                            R$ {reportsData.transactions.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Total de Despesas</div>
+                          <div className="text-2xl font-bold text-red-400">
+                            R$ {reportsData.transactions.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Contas Ativas</div>
+                          <div className="text-2xl font-bold">{reportsData.accounts.active}</div>
+                        </div>
+
+                        <div className="bg-background p-4 rounded-lg border border-border">
+                          <div className="text-sm text-muted-foreground mb-1">Total de Famílias</div>
+                          <div className="text-2xl font-bold">{reportsData.families.total}</div>
+                        </div>
+                      </div>
+
+                      {/* Período */}
+                      <div className="bg-background p-4 rounded-lg border border-border">
+                        <div className="text-sm text-muted-foreground mb-2">Período do Relatório</div>
+                        <div className="text-sm">
+                          {new Date(reportsData.period.start_date).toLocaleDateString('pt-BR')} até{' '}
+                          {new Date(reportsData.period.end_date).toLocaleDateString('pt-BR')}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">Selecione um período e clique em "Gerar Relatório"</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

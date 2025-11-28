@@ -48,6 +48,7 @@ async def update_current_user(
         username=user_update.username,
         full_name=user_update.full_name,
         is_active=user_update.is_active,
+        theme_preference=user_update.theme_preference,
     )
     return user
 

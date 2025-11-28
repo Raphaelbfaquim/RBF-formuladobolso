@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import apiClient from '@/lib/api/client'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
@@ -12,7 +13,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [twoFactorStatus, setTwoFactorStatus] = useState<any>(null)
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
   // Formulários
   const [profileForm, setProfileForm] = useState({
@@ -37,8 +39,40 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserData()
     load2FAStatus()
-    loadTheme()
+    setMounted(true)
   }, [])
+
+  // Sincronizar tema quando montar e quando mudar
+  useEffect(() => {
+    if (!mounted) return
+    
+    // Determinar qual tema aplicar baseado no theme e resolvedTheme
+    let shouldBeDark = true // default
+    
+    if (theme === 'light') {
+      shouldBeDark = false
+    } else if (theme === 'dark') {
+      shouldBeDark = true
+    } else if (theme === 'system' || !theme) {
+      // Se for system ou undefined, usar resolvedTheme ou detectar preferência
+      if (resolvedTheme === 'light') {
+        shouldBeDark = false
+      } else if (resolvedTheme === 'dark') {
+        shouldBeDark = true
+      } else {
+        // Se não tem resolvedTheme, detectar preferência do sistema
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        shouldBeDark = prefersDark
+      }
+    }
+    
+    // Aplicar tema na tag HTML
+    if (shouldBeDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [mounted, theme, resolvedTheme])
 
   const loadUserData = async () => {
     try {
@@ -49,6 +83,11 @@ export default function SettingsPage() {
         username: response.data.username || '',
         full_name: response.data.full_name || '',
       })
+      
+      // Carregar tema do backend se existir
+      if (response.data.theme_preference) {
+        setTheme(response.data.theme_preference as 'light' | 'dark' | 'system')
+      }
     } catch (error: any) {
       console.error('Erro ao carregar dados do usuário:', error)
     }
@@ -63,32 +102,6 @@ export default function SettingsPage() {
     }
   }
 
-  const loadTheme = () => {
-    const savedTheme = localStorage.getItem('theme') || 'system'
-    setTheme(savedTheme as 'light' | 'dark' | 'system')
-    applyTheme(savedTheme)
-  }
-
-  const applyTheme = (themeValue: string) => {
-    const root = document.documentElement
-    if (themeValue === 'light') {
-      root.classList.remove('dark')
-      root.style.colorScheme = 'light'
-    } else if (themeValue === 'dark') {
-      root.classList.add('dark')
-      root.style.colorScheme = 'dark'
-    } else {
-      // system
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      if (prefersDark) {
-        root.classList.add('dark')
-        root.style.colorScheme = 'dark'
-      } else {
-        root.classList.remove('dark')
-        root.style.colorScheme = 'light'
-      }
-    }
-  }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,11 +211,50 @@ export default function SettingsPage() {
     }
   }
 
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    console.log('Mudando tema para:', newTheme)
+    
+    // Aplicar imediatamente na DOM para feedback visual instantâneo
+    if (newTheme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (prefersDark) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    } else if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    
+    // Atualizar via next-themes (salva no localStorage)
     setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    applyTheme(newTheme)
-    toast.success('Tema alterado!')
+    
+    // Salvar no backend
+    try {
+      await apiClient.put('/users/me', {
+        theme_preference: newTheme
+      })
+      toast.success(`Tema alterado para ${newTheme === 'light' ? 'Claro' : newTheme === 'dark' ? 'Escuro' : 'Sistema'}!`)
+    } catch (error: any) {
+      console.error('Erro ao salvar tema no backend:', error)
+      toast.error('Tema aplicado, mas não foi possível salvar no servidor')
+    }
+  }
+
+  // Evitar hidratação mismatch - mostrar loading até o tema estar pronto
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Configurações</h1>
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const tabs = [
@@ -479,7 +531,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => handleThemeChange('system')}
                           className={`p-6 rounded-lg border-2 transition-all ${
-                            theme === 'system'
+                            theme === 'system' || (!theme && resolvedTheme)
                               ? 'border-indigo-500 bg-indigo-500/10'
                               : 'border-border hover:border-indigo-500/50'
                           }`}

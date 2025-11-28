@@ -26,6 +26,7 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)
+    theme_preference = Column(String(20), nullable=True, default='system', server_default='system')  # 'light', 'dark', 'system'
     reset_token = Column(String(255), nullable=True, index=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(pytz.UTC), nullable=False)

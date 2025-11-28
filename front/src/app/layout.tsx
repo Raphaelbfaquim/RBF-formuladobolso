@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { WorkspaceProvider } from '@/components/providers/workspace-provider'
+import { ThemeLoader } from '@/components/providers/theme-loader'
 import { Toaster } from 'react-hot-toast'
 import '@/styles/globals.css'
 
@@ -44,6 +45,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ThemeLoader />
           <WorkspaceProvider>
             {children}
           </WorkspaceProvider>

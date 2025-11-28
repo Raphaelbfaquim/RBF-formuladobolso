@@ -19,6 +19,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
+    theme_preference: Optional[str] = Field(None, pattern='^(light|dark|system)$')
 
 
 class UserResponse(UserBase):
@@ -26,6 +27,7 @@ class UserResponse(UserBase):
     is_active: bool
     is_verified: bool
     role: str
+    theme_preference: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

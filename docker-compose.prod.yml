@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${DOCKER_USERNAME:-efaquim}/formulado-api:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-faquim}/formulado-api:${IMAGE_TAG:-latest}
     container_name: formulado_api
     command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000
     ports:
@@ -60,7 +60,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ${DOCKER_USERNAME:-efaquim}/formulado-frontend:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-faquim}/formulado-frontend:${IMAGE_TAG:-latest}
     container_name: formulado_frontend
     ports:
       - "3000:3000"
@@ -69,6 +69,17 @@ services:
       - NODE_ENV=production
     depends_on:
       - api
+    networks:
+      - formulado_network
+    restart: unless-stopped
+
+  marketing:
+    image: ${DOCKER_USERNAME:-faquim}/formulado-marketing:${IMAGE_TAG:-latest}
+    container_name: formulado_marketing
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
     networks:
       - formulado_network
     restart: unless-stopped
@@ -85,6 +96,7 @@ services:
     depends_on:
       - api
       - frontend
+      - marketing
     networks:
       - formulado_network
     restart: unless-stopped
