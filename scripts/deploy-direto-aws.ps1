@@ -41,19 +41,19 @@ if (-not (Test-Path $SSH_KEY)) {
     exit 1
 }
 
-# Build das imagens localmente
+# Build das imagens localmente (SEM CACHE para garantir atualização)
 $buildApi = ($service -eq "api" -or $service -eq "all")
 $buildFront = ($service -eq "front" -or $service -eq "all")
 
 if ($buildApi) {
-    Write-Host "Buildando API..." -ForegroundColor Yellow
-    docker build -t formulado-api:latest -f back/docker/Dockerfile back/
+    Write-Host "Buildando API (sem cache)..." -ForegroundColor Yellow
+    docker build --no-cache -t formulado-api:latest -f back/docker/Dockerfile back/
     if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
 if ($buildFront) {
-    Write-Host "Buildando Frontend..." -ForegroundColor Yellow
-    docker build -t formulado-frontend:latest -f front/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://3.238.162.190 front/
+    Write-Host "Buildando Frontend (sem cache)..." -ForegroundColor Yellow
+    docker build --no-cache -t formulado-frontend:latest -f front/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://3.238.162.190 front/
     if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
@@ -76,11 +76,22 @@ scp -i $SSH_KEY $scpFiles ${AWS_HOST}:~/
 
 # Construir script bash dinamicamente
 $scriptLines = @()
+$scriptLines += "set -e"
 $scriptLines += "cd ~/RBF-formuladobolso || { git clone https://github.com/Raphaelbfaquim/RBF-formuladobolso.git && cd RBF-formuladobolso; }"
-$scriptLines += "git pull origin main"
+$scriptLines += "echo 'Atualizando codigo do repositorio...'"
+$scriptLines += "git pull origin main || true"
+$scriptLines += ""
+$scriptLines += "# Limpar imagens antigas para forcar atualizacao"
+$scriptLines += "echo 'Limpando imagens antigas...'"
+if ($buildApi) {
+    $scriptLines += "docker rmi efaquim/formulado-api:latest formulado-api:latest 2>/dev/null || true"
+}
+if ($buildFront) {
+    $scriptLines += "docker rmi efaquim/formulado-frontend:latest formulado-frontend:latest 2>/dev/null || true"
+}
 $scriptLines += ""
 $scriptLines += "# Carregar imagens"
-$scriptLines += "echo 'Carregando imagens...'"
+$scriptLines += "echo 'Carregando novas imagens...'"
 
 if ($buildApi) {
     $scriptLines += "docker load -i ~/api-image.tar"
@@ -93,7 +104,8 @@ if ($buildFront) {
 }
 
 $scriptLines += ""
-$scriptLines += "# Parar containers antigos (apenas os que serao atualizados)"
+$scriptLines += "# Parar e remover containers antigos (forcando recriacao)"
+$scriptLines += "echo 'Parando containers antigos...'"
 if ($service -eq "api") {
     $scriptLines += "docker-compose -f docker-compose.prod.yml stop api || true"
     $scriptLines += "docker-compose -f docker-compose.prod.yml rm -f api || true"
@@ -105,18 +117,35 @@ if ($service -eq "api") {
 }
 
 $scriptLines += ""
-$scriptLines += "# Iniciar containers"
+$scriptLines += "# Limpar cache do Docker (opcional, mas ajuda)"
+$scriptLines += "docker system prune -f || true"
+$scriptLines += ""
+$scriptLines += "# Iniciar containers com forcar recriacao"
+$scriptLines += "echo 'Iniciando containers...'"
 $scriptLines += "export DOCKER_USERNAME=efaquim"
 $scriptLines += "export IMAGE_TAG=latest"
 
 if ($service -eq "api") {
-    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d api"
+    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d --force-recreate --no-deps api"
+    $scriptLines += "echo 'Aguardando API iniciar...'"
+    $scriptLines += "sleep 10"
+    $scriptLines += "echo 'Executando migracoes do banco de dados...'"
+    $scriptLines += "docker-compose -f docker-compose.prod.yml exec -T api alembic upgrade head || echo 'Aviso: Nao foi possivel executar migracoes'"
 } elseif ($service -eq "front") {
-    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d frontend nginx"
+    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d --force-recreate --no-deps frontend nginx"
 } else {
-    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d"
+    $scriptLines += "docker-compose -f docker-compose.prod.yml up -d --force-recreate"
+    $scriptLines += "echo 'Aguardando servicos iniciarem...'"
+    $scriptLines += "sleep 15"
+    $scriptLines += "echo 'Executando migracoes do banco de dados...'"
+    $scriptLines += "docker-compose -f docker-compose.prod.yml exec -T api alembic upgrade head || echo 'Aviso: Nao foi possivel executar migracoes'"
 }
 
+$scriptLines += ""
+$scriptLines += "# Verificar status dos containers"
+$scriptLines += "echo ''"
+$scriptLines += "echo 'Status dos containers:'"
+$scriptLines += "docker-compose -f docker-compose.prod.yml ps"
 $scriptLines += ""
 $scriptLines += "# Limpar arquivos temporarios"
 if ($buildApi) {

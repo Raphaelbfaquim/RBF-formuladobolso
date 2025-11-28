@@ -10,8 +10,8 @@ import enum
 
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"
-    USER = "user"
+    ADMIN = "ADMIN"  # Valor no banco está em maiúsculas
+    USER = "USER"    # Valor no banco está em maiúsculas
 
 
 class User(Base):

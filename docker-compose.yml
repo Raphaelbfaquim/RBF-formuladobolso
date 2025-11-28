@@ -40,15 +40,19 @@ services:
       context: ./back
       dockerfile: docker/Dockerfile
     container_name: formulado_api
-    command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn src.presentation.api.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./back:/app
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://formulado_user:formulado_pass@postgres:5432/formulado_db
+      - DATABASE_SYNC_URL=postgresql://formulado_user:formulado_pass@postgres:5432/formulado_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+      - ENVIRONMENT=development
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,12 +66,12 @@ services:
       context: ./front
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://3.238.162.190:8000
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
     container_name: formulado_frontend
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://3.238.162.190:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - api
     networks:

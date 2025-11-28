@@ -33,7 +33,7 @@ function Write-ColorOutput($ForegroundColor) {
 
 # Variáveis
 $AWS_HOST = if ($env:AWS_HOST) { $env:AWS_HOST } else { "ubuntu@3.238.162.190" }
-$DOCKER_USERNAME = if ($env:DOCKER_USERNAME) { $env:DOCKER_USERNAME } else { "efaquim" }
+$DOCKER_USERNAME = if ($env:DOCKER_USERNAME) { $env:DOCKER_USERNAME } else { "faquim" }
 $DOCKER_PASSWORD = $env:DOCKER_PASSWORD
 $IMAGE_TAG = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
 $SSH_KEY = if ($env:AWS_SSH_KEY) { $env:AWS_SSH_KEY } else { "$env:USERPROFILE\.ssh\LightsailDefaultKey-us-east-1.pem" }
@@ -85,32 +85,70 @@ else
 fi
 
 echo "📥 Fazendo pull das imagens..."
-docker pull ${DOCKER_USERNAME}/formulado-api:${IMAGE_TAG} || {
-  echo "❌ Erro ao fazer pull da API"
-  exit 1
-}
 
-# Tentar fazer pull do frontend (opcional, pode não existir ainda)
-if docker pull ${DOCKER_USERNAME}/formulado-frontend:${IMAGE_TAG} 2>/dev/null; then
-  echo "✅ Frontend encontrado no Docker Hub"
-else
-  echo "⚠️  Frontend não encontrado no Docker Hub, será pulado"
-  export SKIP_FRONTEND=true
+# Determinar quais imagens fazer pull
+PULL_API=false
+PULL_FRONT=false
+
+if [ "\$SERVICE_TYPE" = "api" ] || [ "\$SERVICE_TYPE" = "all" ]; then
+  PULL_API=true
+fi
+
+if [ "\$SERVICE_TYPE" = "front" ] || [ "\$SERVICE_TYPE" = "all" ]; then
+  PULL_FRONT=true
+fi
+
+if [ "\$PULL_API" = "true" ]; then
+  docker pull \${DOCKER_USERNAME}/formulado-api:\${IMAGE_TAG} || {
+    echo "❌ Erro ao fazer pull da API"
+    exit 1
+  }
+  echo "✅ API baixada com sucesso"
+fi
+
+if [ "\$PULL_FRONT" = "true" ]; then
+  if docker pull \${DOCKER_USERNAME}/formulado-frontend:\${IMAGE_TAG} 2>/dev/null; then
+    echo "✅ Frontend baixado com sucesso"
+  else
+    echo "⚠️  Frontend não encontrado no Docker Hub"
+    PULL_FRONT=false
+  fi
 fi
 
 echo "🛑 Parando containers antigos..."
-docker-compose -f docker-compose.prod.yml down || true
+
+# Parar apenas os containers que serão atualizados
+if [ "\$SERVICE_TYPE" = "api" ]; then
+  docker-compose -f docker-compose.prod.yml stop api || true
+  docker-compose -f docker-compose.prod.yml rm -f api || true
+elif [ "\$SERVICE_TYPE" = "front" ]; then
+  docker-compose -f docker-compose.prod.yml stop frontend nginx || true
+  docker-compose -f docker-compose.prod.yml rm -f frontend nginx || true
+else
+  docker-compose -f docker-compose.prod.yml down || true
+fi
 
 echo "🚀 Iniciando containers com imagens do Docker Hub..."
-export DOCKER_USERNAME=${DOCKER_USERNAME}
-export IMAGE_TAG=${IMAGE_TAG}
+export DOCKER_USERNAME=\${DOCKER_USERNAME}
+export IMAGE_TAG=\${IMAGE_TAG}
 
-# Se frontend não existe, iniciar apenas API e dependências (sem nginx)
-if [ "$SKIP_FRONTEND" = "true" ]; then
-  echo "📦 Iniciando apenas API, PostgreSQL e Redis (sem frontend/nginx)..."
-  docker-compose -f docker-compose.prod.yml up -d postgres redis api
+# Iniciar containers baseado no serviço
+if [ "\$SERVICE_TYPE" = "api" ]; then
+  docker-compose -f docker-compose.prod.yml up -d api
+elif [ "\$SERVICE_TYPE" = "front" ]; then
+  if [ "\$PULL_FRONT" = "true" ]; then
+    docker-compose -f docker-compose.prod.yml up -d frontend nginx
+  else
+    echo "⚠️  Frontend não disponível, iniciando apenas nginx (se existir)"
+    docker-compose -f docker-compose.prod.yml up -d nginx || true
+  fi
 else
-  docker-compose -f docker-compose.prod.yml up -d
+  if [ "\$PULL_FRONT" = "true" ]; then
+    docker-compose -f docker-compose.prod.yml up -d
+  else
+    echo "📦 Iniciando apenas API, PostgreSQL e Redis (sem frontend/nginx)..."
+    docker-compose -f docker-compose.prod.yml up -d postgres redis api
+  fi
 fi
 
 echo "⏳ Aguardando serviços iniciarem..."
@@ -142,7 +180,7 @@ echo "✅ Deploy concluído!"
 '@
 
 # Preparar variáveis de ambiente para passar via SSH
-$envVars = "DOCKER_USERNAME=$DOCKER_USERNAME"
+$envVars = "DOCKER_USERNAME=$DOCKER_USERNAME SERVICE_TYPE=$service"
 if ($DOCKER_PASSWORD) {
     $envVars += " DOCKER_PASSWORD=$DOCKER_PASSWORD"
 }

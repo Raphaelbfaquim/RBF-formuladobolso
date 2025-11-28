@@ -1,0 +1,14 @@
+ DEPLOY DIRETO (sem Docker Hub - mais rapido):
+   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1
+   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1 api
+   powershell -ExecutionPolicy Bypass -File .\deploy-aws.ps1 front
+
+ DOCKER HUB - Build e Push:
+   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1
+   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1 api
+   powershell -ExecutionPolicy Bypass -File .\build-push-dockerhub.ps1 front
+
+ DOCKER HUB - Deploy:
+   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1
+   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1 api
+   powershell -ExecutionPolicy Bypass -File .\deploy-dockerhub.ps1 front

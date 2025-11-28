@@ -28,6 +28,7 @@ const menuItems = [
   { name: 'Gamificação', path: '/gamification', icon: '🏆', module: 'gamification' },
   { name: 'Família', path: '/family', icon: '👨‍👩‍👧‍👦', module: 'family' },
   { name: 'Configurações', path: '/settings', icon: '⚙️', module: 'settings' },
+  { name: 'Admin', path: '/admin', icon: '🛡️', module: 'admin', adminOnly: true },
 ]
 
 export default function Sidebar() {
@@ -37,11 +38,22 @@ export default function Sidebar() {
   const [hasFamily, setHasFamily] = useState(false)
   const [isOwnerOrAdmin, setIsOwnerOrAdmin] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     setIsMounted(true)
+    loadUser()
     loadPermissions()
   }, [])
+
+  const loadUser = async () => {
+    try {
+      const response = await apiClient.get('/users/me')
+      setUser(response.data)
+    } catch (error: any) {
+      console.log('Erro ao carregar usuário:', error)
+    }
+  }
 
   const loadPermissions = async () => {
     try {
@@ -103,6 +115,11 @@ export default function Sidebar() {
 
         <nav className="space-y-1">
           {menuItems.map((item) => {
+            // Verificar se é item apenas para admin
+            if (item.adminOnly && user?.role !== 'admin' && user?.role !== 'ADMIN') {
+              return null
+            }
+
             // Verificar se o usuário tem permissão para ver este módulo
             const canView = hasPermission(item.module || '')
             

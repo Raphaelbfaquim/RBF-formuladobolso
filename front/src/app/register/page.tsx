@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { authApi } from '@/lib/api/auth'
 import toast from 'react-hot-toast'
 
@@ -14,9 +15,17 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     full_name: '',
+    two_factor_code: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [show2FA, setShow2FA] = useState(false)
+  const [twoFactorData, setTwoFactorData] = useState<{
+    secret: string
+    qr_code: string
+    backup_codes: string[]
+  } | null>(null)
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -43,19 +52,39 @@ export default function RegisterPage() {
     setLoading(true)
     
     try {
-      const user = await authApi.register({
+      console.log('📤 Enviando requisição de registro...')
+      const response = await authApi.register({
         username: formData.username,
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name || undefined,
       })
       
-      toast.success('Conta criada com sucesso!')
+      console.log('📥 Resposta recebida:', response)
+      console.log('📥 Tem two_factor?', !!response.two_factor)
       
-      // Redirecionar para login após 1 segundo
-      setTimeout(() => {
-        router.push('/login')
-      }, 1000)
+      // Configurar 2FA se recebido
+      if (response.two_factor) {
+        console.log('✅ 2FA data recebido:', response.two_factor)
+        setTwoFactorData(response.two_factor)
+        setShow2FA(true)
+        
+        // Converter QR code base64 para URL
+        if (response.two_factor.qr_code) {
+          console.log('✅ QR Code encontrado, tamanho:', response.two_factor.qr_code.length)
+          setQrCodeUrl(`data:image/png;base64,${response.two_factor.qr_code}`)
+        } else {
+          console.error('❌ QR Code não encontrado na resposta')
+          toast.error('Erro: QR Code não foi gerado. Entre em contato com o suporte.')
+        }
+      } else {
+        // Se não tem 2FA, redirecionar para login
+        console.warn('⚠️ Resposta não contém two_factor. Estrutura:', Object.keys(response))
+        toast.success('Conta criada com sucesso!')
+        setTimeout(() => {
+          router.push('/login')
+        }, 1000)
+      }
       
     } catch (error: any) {
       console.error('Erro no registro:', error)
@@ -65,6 +94,89 @@ export default function RegisterPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handle2FASetup = async () => {
+    if (!formData.two_factor_code) {
+      toast.error('Por favor, insira o código do autenticador')
+      return
+    }
+
+    // TODO: Verificar código 2FA com backend
+    // Por enquanto, apenas redirecionar
+    toast.success('Autenticação de dois fatores configurada!')
+    setTimeout(() => {
+      router.push('/login')
+    }, 1000)
+  }
+
+  // Mostrar tela de configuração 2FA
+  if (show2FA && twoFactorData) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="glass rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold mb-2">Configure Autenticação de Dois Fatores</h1>
+              <p className="text-muted-foreground text-sm">
+                Escaneie o QR Code com seu app autenticador
+              </p>
+            </div>
+
+            {qrCodeUrl && (
+              <div className="flex justify-center mb-6">
+                <div className="bg-white p-4 rounded-lg">
+                  <Image
+                    src={qrCodeUrl}
+                    alt="QR Code 2FA"
+                    width={200}
+                    height={200}
+                    className="rounded"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Código do Autenticador
+              </label>
+              <input
+                type="text"
+                value={formData.two_factor_code}
+                onChange={(e) => setFormData({ ...formData, two_factor_code: e.target.value })}
+                placeholder="000000"
+                maxLength={6}
+                className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Digite o código de 6 dígitos do seu app autenticador
+              </p>
+            </div>
+
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <p className="text-xs text-yellow-400">
+                <strong>Códigos de Backup:</strong> Guarde estes códigos em local seguro
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {twoFactorData.backup_codes?.map((code: string, idx: number) => (
+                  <code key={idx} className="text-xs bg-background px-2 py-1 rounded">
+                    {code}
+                  </code>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handle2FASetup}
+              className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+            >
+              Confirmar e Finalizar
+            </button>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -137,7 +249,7 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                minLength={6}
+                minLength={8}
                 className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 placeholder="••••••••"
               />
@@ -154,7 +266,7 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                minLength={6}
+                minLength={8}
                 className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 placeholder="••••••••"
               />
